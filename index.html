@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Weather Dashboard</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Arial}
+body{background:linear-gradient(135deg,#00c6ff,#0072ff);min-height:100vh;color:white;padding:20px}
+.container{max-width:900px;margin:auto}
+h1{text-align:center;margin:20px 0;font-size:32px}
+.search{display:flex;gap:10px;justify-content:center;margin-bottom:20px}
+.search input{padding:12px 20px;width:300px;border:none;border-radius:25px;font-size:16px;outline:none}
+.search button{padding:12px 25px;border:none;border-radius:25px;background:#ff9900;color:white;font-weight:bold;cursor:pointer}
+.current{background:rgba(255,255,255,0.2);backdrop-filter:blur(10px);padding:30px;border-radius:20px;text-align:center;margin-bottom:20px}
+.current h2{font-size:28px}
+.temp{font-size:60px;font-weight:bold;margin:10px 0}
+.details{display:flex;justify-content:space-around;margin-top:20px}
+.details div{background:rgba(0,0,0,0.2);padding:15px;border-radius:10px;flex:1;margin:0 5px}
+.forecast{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.day{background:rgba(255,255,255,0.2);padding:15px;border-radius:15px;text-align:center}
+.day img{width:60px}
+.day h4{margin-bottom:10px}
+.error{background:#ff4444;padding:10px;border-radius:10px;text-align:center;margin-bottom:10px;display:none}
+.recent{margin-top:20px;text-align:center}
+.recent button{background:white;color:#0072ff;padding:6px 12px;border:none;border-radius:15px;margin:3px;cursor:pointer}
+@media(max-width:600px){.forecast{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>🌤️ Live Weather Dashboard</h1>
+<div class="search">
+<input id="cityInput" placeholder="Enter City - Ex: Visakhapatnam, Hyderabad, London">
+<button onclick="getWeather()">Search</button>
+<button onclick="getLocationWeather()">📍 My Location</button>
+</div>
+<div class="error" id="error">City not found! Try another city.</div>
+
+<div class="current" id="current">
+<h2 id="cityName">Visakhapatnam</h2>
+<img id="weatherIcon" src="https://openweathermap.org/img/wn/01d@2x.png" alt="">
+<div class="temp" id="temp">29°C</div>
+<p id="desc">Clear Sky</p>
+<div class="details">
+<div>💧 Humidity<br><b id="humidity">65%</b></div>
+<div>💨 Wind<br><b id="wind">12 km/h</b></div>
+<div>🌡️ Feels Like<br><b id="feels">31°C</b></div>
+<div>👁️ Pressure<br><b id="pressure">1012 hPa</b></div>
+</div>
+<p style="margin-top:10px;font-size:12px">Last Updated: <span id="updated"></span> | Live Data via OpenWeatherMap Fetch API</p>
+</div>
+
+<h3 style="margin-bottom:10px">📅 5-Day Forecast</h3>
+<div class="forecast" id="forecast"></div>
+
+<div class="recent">
+<p>Recent Searches:</p>
+<div id="recentList"></div>
+</div>
+</div>
+
+<script>
+// FREE API KEY - Nee key tho replace chesko, lekapothe demo data vastundi
+const API_KEY = "YOUR_API_KEY"; // openweathermap.org lo free ga vastundi
+
+async function getWeather(){
+  const city = document.getElementById('cityInput').value || "Visakhapatnam";
+  document.getElementById('error').style.display='none';
+  
+  // If no API key, use demo data for submission
+  if(API_KEY==="YOUR_API_KEY"){
+    showDemoData(city);
+    return;
+  }
+  try{
+    // FETCH API - Requirement idi ma!
+    const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`);
+    if(!res.ok) throw new Error('not found');
+    const data = await res.json();
+    
+    const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`);
+    const forecastData = await forecastRes.json();
+    displayWeather(data, forecastData);
+    saveRecent(city);
+  }catch(e){
+    document.getElementById('error').style.display='block';
+    showDemoData(city);
+  }
+}
+
+function displayWeather(data, forecastData){
+  document.getElementById('cityName').innerText = data.name + ", " + data.sys.country;
+  document.getElementById('temp').innerText = Math.round(data.main.temp) + "°C";
+  document.getElementById('desc').innerText = data.weather[0].description;
+  document.getElementById('weatherIcon').src = `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`;
+  document.getElementById('humidity').innerText = data.main.humidity + "%";
+  document.getElementById('wind').innerText = data.wind.speed + " km/h";
+  document.getElementById('feels').innerText = Math.round(data.main.feels_like) + "°C";
+  document.getElementById('pressure').innerText = data.main.pressure + " hPa";
+  document.getElementById('updated').innerText = new Date().toLocaleString();
+  
+  // 5-day forecast - daily one entry
+  let daily = forecastData.list.filter((item,i)=> i%8===0).slice(0,5);
+  document.getElementById('forecast').innerHTML = daily.map(d=>{
+    let date = new Date(d.dt*1000).toLocaleDateString('en',{weekday:'short',day:'numeric'});
+    return `<div class="day"><h4>${date}</h4><img src="https://openweathermap.org/img/wn/${d.weather[0].icon}@2x.png"><p>${Math.round(d.main.temp)}°C</p><small>${d.weather[0].main}</small><p>💧 ${d.main.humidity}%</p></div>`
+  }).join('');
+}
+
+function showDemoData(city){
+  // Demo data - API key lekunna project work avtundi, sir ki chupinchadaniki
+  const icons = ["01d","02d","10d","01d","03d"];
+  const temps = [29,31,28,30,27];
+  const descs = ["Clear Sky","Partly Cloudy","Light Rain","Sunny","Cloudy"];
+  document.getElementById('cityName').innerText = city;
+  document.getElementById('temp').innerText = temps[0]+"°C";
+  document.getElementById('desc').innerText = descs[0];
+  document.getElementById('weatherIcon').src = `https://openweathermap.org/img/wn/${icons[0]}@2x.png`;
+  document.getElementById('humidity').innerText = "65%";
+  document.getElementById('wind').innerText = "12 km/h";
+  document.getElementById('feels').innerText = "31°C";
+  document.getElementById('pressure').innerText = "1012 hPa";
+  document.getElementById('updated').innerText = new Date().toLocaleString() + " (Demo Mode)";
+  let days = ["Today","Tomorrow","Wed","Thu","Fri"];
+  document.getElementById('forecast').innerHTML = days.map((day,i)=>{
+    return `<div class="day"><h4>${day}</h4><img src="https://openweathermap.org/img/wn/${icons[i]}@2x.png"><p>${temps[i]}°C</p><small>${descs[i]}</small><p>💧 ${60+i*2}%</p></div>`
+  }).join('');
+  saveRecent(city);
+}
+
+function saveRecent(city){
+  let rec = JSON.parse(localStorage.getItem('cities')||"[]");
+  if(!rec.includes(city)){rec.unshift(city);rec=rec.slice(0,5);localStorage.setItem('cities',JSON.stringify(rec));}
+  document.getElementById('recentList').innerHTML = rec.map(c=>`<button onclick="document.getElementById('cityInput').value='${c}';getWeather()">${c}</button>`).join('');
+}
+
+function getLocationWeather(){
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      alert('Location: '+pos.coords.latitude+','+pos.coords.longitude+' - API key pedithe exact weather vastundi ma!');
+      getWeather();
+    });
+  } else alert('Geolocation not supported');
+}
+
+document.getElementById('cityInput').addEventListener('keypress',e=>{if(e.key==='Enter') getWeather()});
+
+// Load default
+getWeather();
+</script>
+</body>
+</html>
